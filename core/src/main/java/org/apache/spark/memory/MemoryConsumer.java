@@ -131,6 +131,7 @@ public abstract class MemoryConsumer {
   }
 
   /**
+   * 获取内存
    * Allocates memory of `size`.
    */
   public long acquireMemory(long size) {

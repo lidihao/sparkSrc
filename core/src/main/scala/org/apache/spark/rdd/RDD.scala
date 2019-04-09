@@ -371,6 +371,7 @@ abstract class RDD[T: ClassTag](
    * Return a new RDD by applying a function to all elements of this RDD.
    */
   def map[U: ClassTag](f: T => U): RDD[U] = withScope {
+    // 将cleanF转化成一个可以被序列化的函数
     val cleanF = sc.clean(f)
     new MapPartitionsRDD[U, T](this, (context, pid, iter) => iter.map(cleanF))
   }
@@ -1532,6 +1533,9 @@ abstract class RDD[T: ClassTag](
   }
 
   /**
+    标志这个RDD将会被checkpoint。这个rdd的数据会被保存在SparkContext.setCheckpointDir上，这个RDD的所有父依赖
+    将会被移除。这一步将会在完成job时调用。强烈推荐如果一个rdd被checkpoint,最好要先被pesisted,这样最不会重新计算这个
+    rdd
    * Mark this RDD for checkpointing. It will be saved to a file inside the checkpoint
    * directory set with `SparkContext#setCheckpointDir` and all references to its parent
    * RDDs will be removed. This function must be called before any job has been
@@ -1942,6 +1946,7 @@ abstract class RDD[T: ClassTag](
 
 
 /**
+  * 定义了各种隐式装换的方法,为RDD进行扩展
  * Defines implicit functions that provide extra functionalities on RDDs of specific types.
  *
  * For example, [[RDD.rddToPairRDDFunctions]] converts an RDD into a [[PairRDDFunctions]] for

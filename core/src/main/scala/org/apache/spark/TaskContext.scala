@@ -198,6 +198,7 @@ abstract class TaskContext extends Serializable {
   private[spark] def getKillReason(): Option[String]
 
   /**
+    * 任务的内存管理
    * Returns the manager for this task's managed memory.
    */
   private[spark] def taskMemoryManager(): TaskMemoryManager

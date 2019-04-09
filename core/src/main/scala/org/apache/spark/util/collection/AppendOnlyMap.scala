@@ -25,6 +25,7 @@ import org.apache.spark.annotation.DeveloperApi
 
 /**
  * :: DeveloperApi ::
+  * 开地址
  * A simple open hash table optimized for the append-only use case, where keys
  * are never removed, but the value for each key may be changed.
  *
@@ -254,11 +255,13 @@ class AppendOnlyMap[K, V](initialCapacity: Int = 64)
   }
 
   /**
+    * //返回一个已经排序数组的Iterator
    * Return an iterator of the map in sorted order. This provides a way to sort the map without
    * using additional memory, at the expense of destroying the validity of the map.
    */
   def destructiveSortedIterator(keyComparator: Comparator[K]): Iterator[(K, V)] = {
     destroyed = true
+    // 将kV往数组的右边移动
     // Pack KV pairs into the front of the underlying array
     var keyIndex, newIndex = 0
     while (keyIndex < capacity) {
@@ -270,7 +273,7 @@ class AppendOnlyMap[K, V](initialCapacity: Int = 64)
       keyIndex += 1
     }
     assert(curSize == newIndex + (if (haveNullValue) 1 else 0))
-
+    // 用TimSort算法排序
     new Sorter(new KVArraySortDataFormat[K, AnyRef]).sort(data, 0, newIndex, keyComparator)
 
     new Iterator[(K, V)] {

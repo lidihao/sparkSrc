@@ -38,6 +38,7 @@ import org.apache.spark.util.random.SamplingUtils
  * the same partition key.
  */
 abstract class Partitioner extends Serializable {
+  // 返回所产生分区的数量
   def numPartitions: Int
   def getPartition(key: Any): Int
 }

@@ -18,6 +18,7 @@
 package org.apache.spark.util
 
 /**
+  * 当全部遍历完这个Iterator,会调用complete方法
  * Wrapper around an iterator which calls a completion method after it successfully iterates
  * through all the elements.
  */

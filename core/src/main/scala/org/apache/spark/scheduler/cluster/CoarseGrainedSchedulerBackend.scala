@@ -141,6 +141,7 @@ class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: Rp
     }
 
     override def receive: PartialFunction[Any, Unit] = {
+      // 任务失败或者完成?
       case StatusUpdate(executorId, taskId, state, data) =>
         scheduler.statusUpdate(taskId, state, data.value)
         if (TaskState.isFinished(state)) {
@@ -261,11 +262,13 @@ class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: Rp
       val taskDescs = CoarseGrainedSchedulerBackend.this.synchronized {
         // Filter out executors under killing
         val activeExecutors = executorDataMap.filterKeys(executorIsAlive)
+        // 查询可以运行TaskExecutor
         val workOffers = activeExecutors.map {
           case (id, executorData) =>
             new WorkerOffer(id, executorData.executorHost, executorData.freeCores,
               Some(executorData.executorAddress.hostPort))
         }.toIndexedSeq
+
         scheduler.resourceOffers(workOffers)
       }
       if (!taskDescs.isEmpty) {

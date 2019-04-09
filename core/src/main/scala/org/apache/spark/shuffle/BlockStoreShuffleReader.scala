@@ -47,7 +47,7 @@ private[spark] class BlockStoreShuffleReader[K, C](
       context,
       blockManager.shuffleClient,
       blockManager,
-      mapOutputTracker.getMapSizesByExecutorId(handle.shuffleId, startPartition, endPartition),
+      mapOutputTracker.getMapSizesByExecutorId(handle.shuffleId, startPartition, endPartition),// 获取MapTask输出的BlockId
       serializerManager.wrapStream,
       // Note: we use getSizeAsMb when no suffix is provided for backwards compatibility
       SparkEnv.get.conf.get(config.REDUCER_MAX_SIZE_IN_FLIGHT) * 1024 * 1024,
@@ -57,7 +57,7 @@ private[spark] class BlockStoreShuffleReader[K, C](
       SparkEnv.get.conf.get(config.SHUFFLE_DETECT_CORRUPT),
       SparkEnv.get.conf.get(config.SHUFFLE_DETECT_CORRUPT_MEMORY),
       readMetrics).toCompletionIterator
-
+    // 获取对象的反序列化器
     val serializerInstance = dep.serializer.newInstance()
 
     // Create a key/value iterator for each stream
@@ -65,6 +65,7 @@ private[spark] class BlockStoreShuffleReader[K, C](
       // Note: the asKeyValueIterator below wraps a key/value iterator inside of a
       // NextIterator. The NextIterator makes sure that close() is called on the
       // underlying InputStream when all records have been read.
+      // 将Stream转化为NextIterator,读取(K,V)
       serializerInstance.deserializeStream(wrappedStream).asKeyValueIterator
     }
 
@@ -77,9 +78,11 @@ private[spark] class BlockStoreShuffleReader[K, C](
       context.taskMetrics().mergeShuffleReadMetrics())
 
     // An interruptible iterator must be used here in order to support task cancellation
+    // InterruptibleIter可以被中断迭代器
     val interruptibleIter = new InterruptibleIterator[(Any, Any)](context, metricIter)
 
     val aggregatedIter: Iterator[Product2[K, C]] = if (dep.aggregator.isDefined) {
+      // 在Map已经进行过聚合
       if (dep.mapSideCombine) {
         // We are reading values that are already combined
         val combinedKeyValuesIterator = interruptibleIter.asInstanceOf[Iterator[(K, C)]]
@@ -88,6 +91,7 @@ private[spark] class BlockStoreShuffleReader[K, C](
         // We don't know the value type, but also don't care -- the dependency *should*
         // have made sure its compatible w/ this aggregator, which will convert the value
         // type to the combined type C
+        // 在map端没有进行过聚合
         val keyValuesIterator = interruptibleIter.asInstanceOf[Iterator[(K, Nothing)]]
         dep.aggregator.get.combineValuesByKey(keyValuesIterator, context)
       }

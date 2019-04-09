@@ -334,7 +334,7 @@ private[spark] class TaskSchedulerImpl(
     logInfo(s"Removed TaskSet ${manager.taskSet.id}, whose tasks have all completed, from pool" +
       s" ${manager.parent.name}")
   }
-
+  // 为单个Taskset分配资源
   private def resourceOfferSingleTaskSet(
       taskSet: TaskSetManager,
       maxLocality: TaskLocality,
@@ -406,19 +406,23 @@ private[spark] class TaskSchedulerImpl(
     // this here to avoid a separate thread and added synchronization overhead, and also because
     // updating the blacklist is only relevant when task offers are being made.
     blacklistTrackerOpt.foreach(_.applyBlacklistTimeout())
-
+    // 根据backList过滤掉一些Executor
     val filteredOffers = blacklistTrackerOpt.map { blacklistTracker =>
       offers.filter { offer =>
         !blacklistTracker.isNodeBlacklisted(offer.host) &&
           !blacklistTracker.isExecutorBlacklisted(offer.executorId)
       }
     }.getOrElse(offers)
-
+    // 打乱offer
     val shuffledOffers = shuffleOffers(filteredOffers)
     // Build a list of tasks to assign to each worker.
+    // 每个任务一个核？
     val tasks = shuffledOffers.map(o => new ArrayBuffer[TaskDescription](o.cores / CPUS_PER_TASK))
+    // 每个Executor可用的core数
     val availableCpus = shuffledOffers.map(o => o.cores).toArray
+    // 可用的slot
     val availableSlots = shuffledOffers.map(o => o.cores / CPUS_PER_TASK).sum
+    // 获取TaskSet列表
     val sortedTaskSets = rootPool.getSortedTaskSetQueue
     for (taskSet <- sortedTaskSets) {
       logDebug("parentName: %s, name: %s, runningTasks: %s".format(
@@ -433,6 +437,7 @@ private[spark] class TaskSchedulerImpl(
     // NOTE: the preferredLocality order: PROCESS_LOCAL, NODE_LOCAL, NO_PREF, RACK_LOCAL, ANY
     for (taskSet <- sortedTaskSets) {
       // Skip the barrier taskSet if the available slots are less than the number of pending tasks.
+      // 当可用的slot不够分配一个TaskSet时，跳过这个TaskSet
       if (taskSet.isBarrier && availableSlots < taskSet.numTasks) {
         // Skip the launch process.
         // TODO SPARK-24819 If the job requires more slots than available (both busy and free
@@ -558,7 +563,7 @@ private[spark] class TaskSchedulerImpl(
   protected def shuffleOffers(offers: IndexedSeq[WorkerOffer]): IndexedSeq[WorkerOffer] = {
     Random.shuffle(offers)
   }
-
+  // 任务完成或失败
   def statusUpdate(tid: Long, state: TaskState, serializedData: ByteBuffer) {
     var failedExecutor: Option[String] = None
     var reason: Option[ExecutorLossReason] = None
@@ -601,6 +606,7 @@ private[spark] class TaskSchedulerImpl(
     // Update the DAGScheduler without holding a lock on this, since that can deadlock
     if (failedExecutor.isDefined) {
       assert(reason.isDefined)
+      // 告诉DAGSchedule任务失败的executor
       dagScheduler.executorLost(failedExecutor.get, reason.get)
       backend.reviveOffers()
     }

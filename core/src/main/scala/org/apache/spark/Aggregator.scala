@@ -30,9 +30,9 @@ import org.apache.spark.util.collection.ExternalAppendOnlyMap
  */
 @DeveloperApi
 case class Aggregator[K, V, C] (
-    createCombiner: V => C,
-    mergeValue: (C, V) => C,
-    mergeCombiners: (C, C) => C) {
+    createCombiner: V => C,// 初始combiner,产生一个初始的聚合值
+    mergeValue: (C, V) => C,// merger新的值到聚合结果
+    mergeCombiners: (C, C) => C) {// merger聚合结果
 
   def combineValuesByKey(
       iter: Iterator[_ <: Product2[K, V]],
@@ -43,6 +43,7 @@ case class Aggregator[K, V, C] (
     combiners.iterator
   }
 
+  // 一般在reduce端调用
   def combineCombinersByKey(
       iter: Iterator[_ <: Product2[K, C]],
       context: TaskContext): Iterator[(K, C)] = {

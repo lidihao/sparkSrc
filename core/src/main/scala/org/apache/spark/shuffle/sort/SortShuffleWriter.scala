@@ -49,6 +49,7 @@ private[spark] class SortShuffleWriter[K, V, C](
 
   /** Write a bunch of records to this task's output */
   override def write(records: Iterator[Product2[K, V]]): Unit = {
+    // 创建一个排序器
     sorter = if (dep.mapSideCombine) {
       new ExternalSorter[K, V, C](
         context, dep.aggregator, Some(dep.partitioner), dep.keyOrdering, dep.serializer)
@@ -59,6 +60,7 @@ private[spark] class SortShuffleWriter[K, V, C](
       new ExternalSorter[K, V, V](
         context, aggregator = None, Some(dep.partitioner), ordering = None, dep.serializer)
     }
+    // 最终调用rdd的迭代器
     sorter.insertAll(records)
 
     // Don't bother including the time to open the merged output file in the shuffle write time,

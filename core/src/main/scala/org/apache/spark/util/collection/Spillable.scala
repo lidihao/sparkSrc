@@ -23,6 +23,7 @@ import org.apache.spark.internal.config._
 import org.apache.spark.memory.{MemoryConsumer, MemoryMode, TaskMemoryManager}
 
 /**
+  * 益写内存的集合到磁盘,当超过内存的限制
  * Spills contents of an in-memory collection to disk when the memory threshold
  * has been exceeded.
  */
@@ -57,7 +58,7 @@ private[spark] abstract class Spillable[C](taskMemoryManager: TaskMemoryManager)
   // For testing only
   private[this] val numElementsForceSpillThreshold: Int =
     SparkEnv.get.conf.get(SHUFFLE_SPILL_NUM_ELEMENTS_FORCE_SPILL_THRESHOLD)
-
+  // 溢写的阈值
   // Threshold for this collection's size in bytes before we start tracking its memory usage
   // To avoid a large number of small spills, initialize this to a value orders of magnitude > 0
   @volatile private[this] var myMemoryThreshold = initialMemoryThreshold

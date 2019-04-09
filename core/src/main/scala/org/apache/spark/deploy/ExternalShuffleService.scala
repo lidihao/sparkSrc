@@ -33,6 +33,7 @@ import org.apache.spark.network.util.TransportConf
 import org.apache.spark.util.{ShutdownHookManager, Utils}
 
 /**
+  * 提供一个executor可以读取shuffle file 的服务，而不用从各个executor中去读取
  * Provides a server from which Executors can read shuffle files (rather than reading directly from
  * each other), to provide uninterrupted access to the files in the face of executors being turned
  * off or killed.
@@ -45,7 +46,7 @@ class ExternalShuffleService(sparkConf: SparkConf, securityManager: SecurityMana
   protected val masterMetricsSystem =
     MetricsSystem.createMetricsSystem(MetricsSystemInstances.SHUFFLE_SERVICE,
       sparkConf, securityManager)
-
+  // 是否开启
   private val enabled = sparkConf.get(config.SHUFFLE_SERVICE_ENABLED)
   private val port = sparkConf.get(config.SHUFFLE_SERVICE_PORT)
 

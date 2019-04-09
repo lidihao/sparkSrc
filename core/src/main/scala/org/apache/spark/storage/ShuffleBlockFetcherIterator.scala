@@ -36,6 +36,7 @@ import org.apache.spark.shuffle.{FetchFailedException, ShuffleReadMetricsReporte
 import org.apache.spark.util.{CompletionIterator, TaskCompletionListener, Utils}
 
 /**
+  * 从多个文件获取数据的迭代器.
  * An iterator that fetches multiple blocks. For local blocks, it fetches from the local block
  * manager. For remote blocks, it fetches them using the provided BlockTransferService.
  *
@@ -392,6 +393,7 @@ final class ShuffleBlockFetcherIterator(
   override def hasNext: Boolean = !isZombie && (numBlocksProcessed < numBlocksToFetch)
 
   /**
+    * 获取下一个block
    * Fetches the next (BlockId, InputStream). If a task fails, the ManagedBuffers
    * underlying each InputStream will be freed by the cleanup() method registered with the
    * TaskCompletionListener. However, callers should close() these InputStreams

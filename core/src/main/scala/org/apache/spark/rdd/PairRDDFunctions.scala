@@ -103,6 +103,7 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
   }
 
   /**
+    * 可以指定Partitioner,是否在Map端聚合,序列化器
    * Generic function to combine the elements for each key using a custom set of aggregation
    * functions. This method is here for backward compatibility. It does not provide combiner
    * classtag information to the shuffle.
@@ -121,6 +122,7 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
   }
 
   /**
+    * 指定分区数默认使用HashPatitioner
    * Simplified version of combineByKeyWithClassTag that hash-partitions the output RDD.
    * This method is here for backward compatibility. It does not provide combiner
    * classtag information to the shuffle.
@@ -150,6 +152,7 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
   }
 
   /**
+    * 给定一个初始值
    * Aggregate the values of each key, using given combine functions and a neutral "zero value".
    * This function can return a different result type, U, than the type of the values in this RDD,
    * V. Thus, we need one operation for merging a V into a U and one operation for merging two U's,

@@ -158,6 +158,7 @@ class ExternalAppendOnlyMap[K, V, C](
       if (estimatedSize > _peakMemoryUsedBytes) {
         _peakMemoryUsedBytes = estimatedSize
       }
+      // 超出内存阈值，溢写数据到磁盘
       if (maybeSpill(currentMap, estimatedSize)) {
         currentMap = new SizeTrackingAppendOnlyMap[K, C]
       }
@@ -185,6 +186,7 @@ class ExternalAppendOnlyMap[K, V, C](
   override protected[this] def spill(collection: SizeTracker): Unit = {
     val inMemoryIterator = currentMap.destructiveSortedIterator(keyComparator)
     val diskMapIterator = spillMemoryIteratorToDisk(inMemoryIterator)
+    // 已经溢到磁盘的Map的迭代器
     spilledMaps += diskMapIterator
   }
 
@@ -209,14 +211,16 @@ class ExternalAppendOnlyMap[K, V, C](
   }
 
   /**
+    * //溢写数据到磁盘
    * Spill the in-memory Iterator to a temporary file on disk.
    */
   private[this] def spillMemoryIteratorToDisk(inMemoryIterator: Iterator[(K, C)])
       : DiskMapIterator = {
+    // 为溢写的数据分配一个blockId,和文件
     val (blockId, file) = diskBlockManager.createTempLocalBlock()
     val writer = blockManager.getDiskWriter(blockId, file, ser, fileBufferSize, writeMetrics)
     var objectsWritten = 0
-
+    // 记录每次flush的大小
     // List of batch sizes (bytes) in the order they are written to disk
     val batchSizes = new ArrayBuffer[Long]
 
@@ -230,6 +234,7 @@ class ExternalAppendOnlyMap[K, V, C](
 
     var success = false
     try {
+      // 将内存中的数据flush到目录中
       while (inMemoryIterator.hasNext) {
         val kv = inMemoryIterator.next()
         writer.write(kv._1, kv._2)
@@ -296,6 +301,7 @@ class ExternalAppendOnlyMap[K, V, C](
   }
 
   /**
+    * 对内存的Map和已经溢写的map进行mergerSort
    * An iterator that sort-merges (K, C) pairs from the in-memory map and the spilled maps
    */
   private class ExternalIterator extends Iterator[(K, C)] {
@@ -319,12 +325,13 @@ class ExternalAppendOnlyMap[K, V, C](
     }
 
     /**
+      * 返回一个拥有相同hash值的键值对
      * Fill a buffer with the next set of keys with the same hash code from a given iterator. We
      * read streams one hash code at a time to ensure we don't miss elements when they are merged.
      *
      * Assumes the given iterator is in sorted order of hash code.
      *
-     * @param it iterator to read from
+     * @param it iterator to read from 有时候你可能需要一个支持“预览”功能的迭代器，这样我们既可以看到下一个待返回的元素，又不会令迭代器跨过这个元素
      * @param buf buffer to write the results into
      */
     private def readNextHashCode(it: BufferedIterator[(K, C)], buf: ArrayBuffer[(K, C)]): Unit = {
@@ -393,6 +400,7 @@ class ExternalAppendOnlyMap[K, V, C](
       var minCombiner = minPair._2
       assert(hashKey(minPair) == minHash)
 
+      // 进行merger(U,U)=>U
       // For all other streams that may have this key (i.e. have the same minimum key hash),
       // merge in the corresponding value (if any) from that stream
       val mergedBuffers = ArrayBuffer[StreamBuffer](minBuffer)
@@ -401,7 +409,7 @@ class ExternalAppendOnlyMap[K, V, C](
         minCombiner = mergeIfKeyExists(minKey, minCombiner, newBuffer)
         mergedBuffers += newBuffer
       }
-
+      // 继续iterator.next(),往Heap添加数据
       // Repopulate each visited stream buffer and add it back to the queue if it is non-empty
       mergedBuffers.foreach { buffer =>
         if (buffer.isEmpty) {

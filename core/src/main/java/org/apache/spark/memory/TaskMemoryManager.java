@@ -36,6 +36,7 @@ import org.apache.spark.unsafe.memory.MemoryBlock;
 import org.apache.spark.util.Utils;
 
 /**
+ * 管理分配给每个单独任务的内存
  * Manages the memory allocated by an individual task.
  * <p>
  * Most of the complexity in this class deals with encoding of off-heap addresses into 64-bit longs.
@@ -109,6 +110,7 @@ public class TaskMemoryManager {
   final MemoryMode tungstenMemoryMode;
 
   /**
+   * 消耗内存的对象
    * Tracks spillable memory consumers.
    */
   @GuardedBy("this")

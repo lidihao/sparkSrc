@@ -423,6 +423,7 @@ class SparkContext(config: SparkConf) extends Logging {
     listenerBus.addToStatusQueue(_statusStore.listener.get)
 
     // Create the Spark execution environment (cache, map output tracker, etc)
+    // 创建Driver端SparkEnv
     _env = createSparkEnv(_conf, isLocal, listenerBus)
     SparkEnv.set(_env)
 
@@ -492,6 +493,7 @@ class SparkContext(config: SparkConf) extends Logging {
       HeartbeatReceiver.ENDPOINT_NAME, new HeartbeatReceiver(this))
 
     // Create and start the scheduler
+    // 创建SchedulerBackend,TaskScheduler
     val (sched, ts) = SparkContext.createTaskScheduler(this, master, deployMode)
     _schedulerBackend = sched
     _taskScheduler = ts
@@ -1998,7 +2000,7 @@ class SparkContext(config: SparkConf) extends Logging {
    */
   def runJob[T, U: ClassTag](
       rdd: RDD[T],
-      func: (TaskContext, Iterator[T]) => U,
+      func: (TaskContext, Iterator[T]) => U,// 对每个分区的处理的函数，返回结果U
       partitions: Seq[Int],
       resultHandler: (Int, U) => Unit): Unit = {
     if (stopped.get()) {
@@ -2653,6 +2655,7 @@ object SparkContext extends Logging {
   }
 
   /**
+    * 根据 masterContext创建TaskScheduler,SchedulerBackend
    * Create a task scheduler based on a given master URL.
    * Return a 2-tuple of the scheduler backend and the task scheduler.
    */

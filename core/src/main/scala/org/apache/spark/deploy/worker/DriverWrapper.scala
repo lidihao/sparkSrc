@@ -62,7 +62,7 @@ object DriverWrapper extends Logging {
         // Delegate to supplied main class
         val clazz = Utils.classForName(mainClass)
         val mainMethod = clazz.getMethod("main", classOf[Array[String]])
-        mainMethod.invoke(null, extraArgs.toArray[String])
+        mainMethod.invoke(null, extraArgs.toArray[String]) // 调用用户的程序主程序
 
         rpcEnv.shutdown()
 

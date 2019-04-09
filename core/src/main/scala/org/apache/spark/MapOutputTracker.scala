@@ -38,6 +38,7 @@ import org.apache.spark.storage.{BlockId, BlockManagerId, ShuffleBlockId}
 import org.apache.spark.util._
 
 /**
+  * 用于跟踪ShuffleMapStage状态的类
  * Helper class used by the [[MapOutputTrackerMaster]] to perform bookkeeping for a single
  * ShuffleMapStage.
  *
@@ -51,6 +52,7 @@ private class ShuffleStatus(numPartitions: Int) {
   // All accesses to the following state must be guarded with `this.synchronized`.
 
   /**
+    * 每个Map任务的状态
    * MapStatus for each partition. The index of the array is the map partition id.
    * Each value in the array is the MapStatus for a partition, or null if the partition
    * is not available. Even though in theory a task may run multiple times (due to speculation,
@@ -453,6 +455,7 @@ private[spark] class MapOutputTrackerMaster(
   }
 
   /**
+    * 移除所有在这个Host上的shuffleOutput
    * Removes all shuffle outputs associated with this host. Note that this will also remove
    * outputs which are served by an external shuffle server (if one exists).
    */
@@ -577,6 +580,7 @@ private[spark] class MapOutputTrackerMaster(
   }
 
   /**
+    * 返回mapoutput大小比指定阈值大的地址
    * Return a list of locations that each have fraction of map output greater than the specified
    * threshold.
    *

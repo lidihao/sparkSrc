@@ -55,7 +55,7 @@ import org.apache.spark.shuffle.ShuffleWriter
 private[spark] class ShuffleMapTask(
     stageId: Int,
     stageAttemptId: Int,
-    taskBinary: Broadcast[Array[Byte]],
+    taskBinary: Broadcast[Array[Byte]],// 任务的序列化Data
     partition: Partition,
     @transient private var locs: Seq[TaskLocation],
     localProperties: Properties,
@@ -85,13 +85,14 @@ private[spark] class ShuffleMapTask(
       threadMXBean.getCurrentThreadCpuTime
     } else 0L
     val ser = SparkEnv.get.closureSerializer.newInstance()
+    // 反序列化文件
     val (rdd, dep) = ser.deserialize[(RDD[_], ShuffleDependency[_, _, _])](
       ByteBuffer.wrap(taskBinary.value), Thread.currentThread.getContextClassLoader)
     _executorDeserializeTimeNs = System.nanoTime() - deserializeStartTimeNs
     _executorDeserializeCpuTime = if (threadMXBean.isCurrentThreadCpuTimeSupported) {
       threadMXBean.getCurrentThreadCpuTime - deserializeStartCpuTime
     } else 0L
-
+    // 执行rdd的iterator方法
     dep.shuffleWriterProcessor.write(rdd, dep, partitionId, context, partition)
   }
 

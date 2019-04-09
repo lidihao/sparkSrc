@@ -141,10 +141,12 @@ private[spark] class TaskSetManager(
   // of failures.
   // Duplicates are handled in dequeueTaskFromList, which ensures that a
   // task hasn't already started running before launching it.
+  // task最好为executor
   private val pendingTasksForExecutor = new HashMap[String, ArrayBuffer[Int]]
 
   // Set of pending tasks for each host. Similar to pendingTasksForExecutor,
-  // but at host level.
+  // but at host level
+  // task最好位置为host.
   private val pendingTasksForHost = new HashMap[String, ArrayBuffer[Int]]
 
   // Set of pending tasks for each rack -- similar to the above.
@@ -186,6 +188,7 @@ private[spark] class TaskSetManager(
 
   // Add all our tasks to the pending lists. We do this in reverse order
   // of task index so that tasks with low indices get launched first.
+  // 添加到pendingTask
   for (i <- (0 until numTasks).reverse) {
     addPendingTask(i)
   }
@@ -459,6 +462,7 @@ private[spark] class TaskSetManager(
       var allowedLocality = maxLocality
 
       if (maxLocality != TaskLocality.NO_PREF) {
+        // 返回最大的允许调度等级
         allowedLocality = getAllowedLocalityLevel(curTime)
         if (allowedLocality > maxLocality) {
           // We're not allowed to search for farther-away tasks
@@ -528,7 +532,7 @@ private[spark] class TaskSetManager(
       None
     }
   }
-
+  // 告诉Schedule 该TaskSet已经完成
   private def maybeFinishTaskSet() {
     if (isZombie && runningTasks == 0) {
       sched.taskSetFinished(this)
@@ -798,6 +802,7 @@ private[spark] class TaskSetManager(
     // "result.value()" in "TaskResultGetter.enqueueSuccessfulTask" before reaching here.
     // Note: "result.value()" only deserializes the value when it's called at the first time, so
     // here "result.value()" just returns the value and won't block other threads.
+    // 告诉dag一个任务已经完成
     sched.dagScheduler.taskEnded(tasks(index), Success, result.value(), result.accumUpdates, info)
     maybeFinishTaskSet()
   }

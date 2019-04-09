@@ -76,12 +76,14 @@ private[spark] class SortShuffleManager(conf: SparkConf) extends ShuffleManager 
 
   /**
    * A mapping from shuffle ids to the number of mappers producing output for those shuffles.
+    * shuffleId到Mapper任务数的映射
    */
   private[this] val numMapsForShuffle = new ConcurrentHashMap[Int, Int]()
 
   override val shuffleBlockResolver = new IndexShuffleBlockResolver(conf)
 
   /**
+    * 获取 ShuffleHandle
    * Obtains a [[ShuffleHandle]] to pass to tasks.
    */
   override def registerShuffle[K, V, C](

@@ -30,6 +30,7 @@ import org.apache.spark.storage._
 import org.apache.spark.util.io.{ChunkedByteBuffer, ChunkedByteBufferOutputStream}
 
 /**
+  * 负责序列化，压缩，加密
  * Component which configures serialization, compression and encryption for various Spark
  * components, including automatic selection of which [[Serializer]] to use for shuffles.
  */

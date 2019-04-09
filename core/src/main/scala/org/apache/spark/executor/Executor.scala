@@ -371,7 +371,7 @@ private[spark] class Executor(
       threadId = Thread.currentThread.getId
       Thread.currentThread.setName(threadName)
       val threadMXBean = ManagementFactory.getThreadMXBean
-      val taskMemoryManager = new TaskMemoryManager(env.memoryManager, taskId)
+      val taskMemoryManager = new TaskMemoryManager(env.memoryManager, taskId)// 任务内存管理器
       val deserializeStartTimeNs = System.nanoTime()
       val deserializeStartCpuTime = if (threadMXBean.isCurrentThreadCpuTimeSupported) {
         threadMXBean.getCurrentThreadCpuTime
@@ -379,7 +379,7 @@ private[spark] class Executor(
       Thread.currentThread.setContextClassLoader(replClassLoader)
       val ser = env.closureSerializer.newInstance()
       logInfo(s"Running $taskName (TID $taskId)")
-      execBackend.statusUpdate(taskId, TaskState.RUNNING, EMPTY_BYTE_BUFFER)
+      execBackend.statusUpdate(taskId, TaskState.RUNNING, EMPTY_BYTE_BUFFER)// 设置任务在运行
       var taskStartTimeNs: Long = 0
       var taskStartCpu: Long = 0
       startGCTime = computeTotalGcTime()
@@ -422,6 +422,7 @@ private[spark] class Executor(
         } else 0L
         var threwException = true
         val value = Utils.tryWithSafeFinally {
+          // 执行Task的计算任务
           val res = task.run(
             taskAttemptId = taskId,
             attemptNumber = taskDescription.attemptNumber,
@@ -538,11 +539,13 @@ private[spark] class Executor(
 
         // directSend = sending directly back to the driver
         val serializedResult: ByteBuffer = {
+          // 结果集太大，丢弃
           if (maxResultSize > 0 && resultSize > maxResultSize) {
             logWarning(s"Finished $taskName (TID $taskId). Result is larger than maxResultSize " +
               s"(${Utils.bytesToString(resultSize)} > ${Utils.bytesToString(maxResultSize)}), " +
               s"dropping it.")
             ser.serialize(new IndirectTaskResult[Any](TaskResultBlockId(taskId), resultSize))
+            // 结果集大于maxDirectResultSize,返回结果块号
           } else if (resultSize > maxDirectResultSize) {
             val blockId = TaskResultBlockId(taskId)
             env.blockManager.putBytes(
@@ -552,6 +555,7 @@ private[spark] class Executor(
             logInfo(
               s"Finished $taskName (TID $taskId). $resultSize bytes result sent via BlockManager)")
             ser.serialize(new IndirectTaskResult[Any](blockId, resultSize))
+            // 直接返回结果
           } else {
             logInfo(s"Finished $taskName (TID $taskId). $resultSize bytes result sent to driver")
             serializedDirectResult

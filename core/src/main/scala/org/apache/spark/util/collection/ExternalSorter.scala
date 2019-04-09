@@ -192,10 +192,12 @@ private[spark] class ExternalSorter[K, V, C](
         addElementsRead()
         kv = records.next()
         map.changeValue((getPartition(kv._1), kv._1), update)
+        // 超过内存阈值可能会溢写到磁盘
         maybeSpillCollection(usingMap = true)
       }
     } else {
       // Stick values into our buffer
+      // 不用聚合直接溢写到磁盘
       while (records.hasNext) {
         addElementsRead()
         val kv = records.next()

@@ -19,7 +19,7 @@ package org.apache.spark.network.shuffle;
 
 import org.apache.spark.network.util.TransportConf;
 
-/**
+/**用来为远程数据创建一个文件
  * A manager to create temp block files used when fetching remote data to reduce the memory usage.
  * It will clean files when they won't be used any more.
  */

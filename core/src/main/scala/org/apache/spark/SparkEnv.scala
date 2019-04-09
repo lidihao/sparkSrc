@@ -65,7 +65,7 @@ class SparkEnv (
     val blockManager: BlockManager,
     val securityManager: SecurityManager,
     val metricsSystem: MetricsSystem,
-    val memoryManager: MemoryManager,
+    val memoryManager: MemoryManager,// 管理Executor,Driver的内存情况
     val outputCommitCoordinator: OutputCommitCoordinator,
     val conf: SparkConf) extends Logging {
 
@@ -285,7 +285,6 @@ object SparkEnv extends Logging {
     val serializerManager = new SerializerManager(serializer, conf, ioEncryptionKey)
 
     val closureSerializer = new JavaSerializer(conf)
-
     def registerOrLookupEndpoint(
         name: String, endpointCreator: => RpcEndpoint):
       RpcEndpointRef = {
@@ -300,8 +299,10 @@ object SparkEnv extends Logging {
     val broadcastManager = new BroadcastManager(isDriver, conf, securityManager)
 
     val mapOutputTracker = if (isDriver) {
+      // Dirver端创建MapOutputTrackerMaster
       new MapOutputTrackerMaster(conf, broadcastManager, isLocal)
     } else {
+      // Executor端创建MapOutputTrackerWorker
       new MapOutputTrackerWorker(conf)
     }
 
@@ -315,6 +316,7 @@ object SparkEnv extends Logging {
     val shortShuffleMgrNames = Map(
       "sort" -> classOf[org.apache.spark.shuffle.sort.SortShuffleManager].getName,
       "tungsten-sort" -> classOf[org.apache.spark.shuffle.sort.SortShuffleManager].getName)
+    // shuffleManager,根据spark.shuffle.manager来实例化对应的类
     val shuffleMgrName = conf.get(config.SHUFFLE_MANAGER)
     val shuffleMgrClass =
       shortShuffleMgrNames.getOrElse(shuffleMgrName.toLowerCase(Locale.ROOT), shuffleMgrName)

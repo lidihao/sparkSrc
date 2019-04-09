@@ -64,13 +64,14 @@ private[deploy] class Master(
   private val reaperIterations = conf.get(REAPER_ITERATIONS)
   private val recoveryMode = conf.get(RECOVERY_MODE)
   private val maxExecutorRetries = conf.get(MAX_EXECUTOR_RETRIES)
-
+  // works
   val workers = new HashSet[WorkerInfo]
   val idToApp = new HashMap[String, ApplicationInfo]
   private val waitingApps = new ArrayBuffer[ApplicationInfo]
   val apps = new HashSet[ApplicationInfo]
-
+  // id -> workInfo
   private val idToWorker = new HashMap[String, WorkerInfo]
+  // address -> workInfo
   private val addressToWorker = new HashMap[RpcAddress, WorkerInfo]
 
   private val endpointToApp = new HashMap[RpcEndpointRef, ApplicationInfo]
@@ -222,6 +223,7 @@ private[deploy] class Master(
   }
 
   override def receive: PartialFunction[Any, Unit] = {
+    // 被选举为leader,进行数据的会服
     case ElectedLeader =>
       val (storedApps, storedDrivers, storedWorkers) = persistenceEngine.readPersistedData(rpcEnv)
       state = if (storedApps.isEmpty && storedDrivers.isEmpty && storedWorkers.isEmpty) {
@@ -238,7 +240,7 @@ private[deploy] class Master(
           }
         }, workerTimeoutMs, TimeUnit.MILLISECONDS)
       }
-
+    // 完成恢复
     case CompleteRecovery => completeRecovery()
 
     case RevokedLeadership =>
@@ -282,7 +284,7 @@ private[deploy] class Master(
         driver.send(RegisteredApplication(app.id, self))
         schedule()
       }
-
+    // Executor状态改变
     case ExecutorStateChanged(appId, execId, state, message, exitStatus) =>
       val execOption = idToApp.get(appId).flatMap(app => app.executors.get(execId))
       execOption match {
@@ -424,6 +426,7 @@ private[deploy] class Master(
   }
 
   override def receiveAndReply(context: RpcCallContext): PartialFunction[Any, Unit] = {
+    // 添加Driver
     case RequestSubmitDriver(description) =>
       if (state != RecoveryState.ALIVE) {
         val msg = s"${Utils.BACKUP_STANDALONE_MASTER_PREFIX}: $state. " +
@@ -565,6 +568,7 @@ private[deploy] class Master(
     // Update the state of recovered apps to RUNNING
     apps.filter(_.state == ApplicationState.WAITING).foreach(_.state = ApplicationState.RUNNING)
 
+    // 由于突然中断，没有分配到worker
     // Reschedule drivers which were not claimed by any workers
     drivers.filter(_.worker.isEmpty).foreach { d =>
       logWarning(s"Driver ${d.id} was not found after master recovery")
@@ -612,26 +616,37 @@ private[deploy] class Master(
       app: ApplicationInfo,
       usableWorkers: Array[WorkerInfo],
       spreadOutApps: Boolean): Array[Int] = {
+    // 该App的Executor所分配的核数
     val coresPerExecutor = app.desc.coresPerExecutor
+    // 一个Executor最小的核数
     val minCoresPerExecutor = coresPerExecutor.getOrElse(1)
+    // 一个work只分配一个Executor
     val oneExecutorPerWorker = coresPerExecutor.isEmpty
+    // 一个Executor占有多少内存
     val memoryPerExecutor = app.desc.memoryPerExecutorMB
     val numUsable = usableWorkers.length
+    // work核数分配列表
     val assignedCores = new Array[Int](numUsable) // Number of cores to give to each worker
+    // work Executor分配列表
     val assignedExecutors = new Array[Int](numUsable) // Number of new executors on each worker
+    // 该次分配的核数
     var coresToAssign = math.min(app.coresLeft, usableWorkers.map(_.coresFree).sum)
 
     /** Return whether the specified worker can launch an executor for this app. */
+    // 判定一个work是否可以再分配一个Executor
     def canLaunchExecutor(pos: Int): Boolean = {
       val keepScheduling = coresToAssign >= minCoresPerExecutor
       val enoughCores = usableWorkers(pos).coresFree - assignedCores(pos) >= minCoresPerExecutor
 
       // If we allow multiple executors per worker, then we can always launch new executors.
       // Otherwise, if there is already an executor on this worker, just give it more cores.
+      // 如果我们可以给每个worker多个Executor,我们每次都会添加新的executor.如果不是，就往该Executor上添加core数
       val launchingNewExecutor = !oneExecutorPerWorker || assignedExecutors(pos) == 0
       if (launchingNewExecutor) {
         val assignedMemory = assignedExecutors(pos) * memoryPerExecutor
+        // 是否有足够的内存
         val enoughMemory = usableWorkers(pos).memoryFree - assignedMemory >= memoryPerExecutor
+        // 是否超过App的Executor限制
         val underLimit = assignedExecutors.sum + app.executors.size < app.executorLimit
         keepScheduling && enoughCores && enoughMemory && underLimit
       } else {
@@ -680,18 +695,22 @@ private[deploy] class Master(
     // Right now this is a very simple FIFO scheduler. We keep trying to fit in the first app
     // in the queue, then the second app, etc.
     for (app <- waitingApps) {
+      //这个App每个Executor所应该分配的核数
       val coresPerExecutor = app.desc.coresPerExecutor.getOrElse(1)
       // If the cores left is less than the coresPerExecutor,the cores left will not be allocated
       if (app.coresLeft >= coresPerExecutor) {
         // Filter out workers that don't have enough resources to launch an executor
+        // 过滤掉那些没有足够核数的work
         val usableWorkers = workers.toArray.filter(_.state == WorkerState.ALIVE)
           .filter(worker => worker.memoryFree >= app.desc.memoryPerExecutorMB &&
             worker.coresFree >= coresPerExecutor)
           .sortBy(_.coresFree).reverse
+        // 描述在每个work上分配多少个core
         val assignedCores = scheduleExecutorsOnWorkers(app, usableWorkers, spreadOutApps)
 
         // Now that we've decided how many cores to allocate on each worker, let's allocate them
         for (pos <- 0 until usableWorkers.length if assignedCores(pos) > 0) {
+          // 在worker上分配executor
           allocateWorkerResourceToExecutors(
             app, assignedCores(pos), app.desc.coresPerExecutor, usableWorkers(pos))
         }
@@ -714,16 +733,20 @@ private[deploy] class Master(
     // If the number of cores per executor is specified, we divide the cores assigned
     // to this worker evenly among the executors with no remainder.
     // Otherwise, we launch a single executor that grabs all the assignedCores on this worker.
+    // 如果有指定每一个Executor的核数，则分配的Execurtor个数为(assignedCores/corePerExecutor).
+    // 否则Executor的个数为一个，核数为coreToAssign
     val numExecutors = coresPerExecutor.map { assignedCores / _ }.getOrElse(1)
     val coresToAssign = coresPerExecutor.getOrElse(assignedCores)
     for (i <- 1 to numExecutors) {
       val exec = app.addExecutor(worker, coresToAssign)
+      // 向work发送命令
       launchExecutor(worker, exec)
       app.state = ApplicationState.RUNNING
     }
   }
 
   /**
+    * 如果有空闲资源就会调度该方法
    * Schedule the currently available resources among waiting apps. This method will be called
    * every time a new app joins or resource availability changes.
    */
@@ -732,7 +755,7 @@ private[deploy] class Master(
       return
     }
     // Drivers take strict precedence over executors
-    val shuffledAliveWorkers = Random.shuffle(workers.toSeq.filter(_.state == WorkerState.ALIVE))
+    val shuffledAliveWorkers = Random.shuffle(workers.toSeq.filter(_.state == WorkerState.ALIVE)) //打乱所有可用的work
     val numWorkersAlive = shuffledAliveWorkers.size
     var curPos = 0
     for (driver <- waitingDrivers.toList) { // iterate over a copy of waitingDrivers
@@ -741,10 +764,11 @@ private[deploy] class Master(
       // explored all alive workers.
       var launched = false
       var numWorkersVisited = 0
-      while (numWorkersVisited < numWorkersAlive && !launched) {
+      while (numWorkersVisited < numWorkersAlive && !launched) { //选择一个内存和核数大于Driver的核数和内存的work来启动Dirver
         val worker = shuffledAliveWorkers(curPos)
         numWorkersVisited += 1
         if (worker.memoryFree >= driver.desc.mem && worker.coresFree >= driver.desc.cores) {
+          // 向worker发送启动Driver的命令
           launchDriver(worker, driver)
           waitingDrivers -= driver
           launched = true
@@ -791,13 +815,13 @@ private[deploy] class Master(
     addressToWorker(workerAddress) = worker
     true
   }
-
+  // 移除worker
   private def removeWorker(worker: WorkerInfo, msg: String) {
     logInfo("Removing worker " + worker.id + " on " + worker.host + ":" + worker.port)
     worker.setState(WorkerState.DEAD)
     idToWorker -= worker.id
     addressToWorker -= worker.endpoint.address
-
+    // 给Driver发送Executor关闭的消息
     for (exec <- worker.executors.values) {
       logInfo("Telling app of lost executor: " + exec.id)
       exec.application.driver.send(ExecutorUpdated(
@@ -805,6 +829,7 @@ private[deploy] class Master(
       exec.state = ExecutorState.LOST
       exec.application.removeExecutor(exec)
     }
+    // 重新调度Driver
     for (driver <- worker.drivers.values) {
       if (driver.desc.supervise) {
         logInfo(s"Re-launching ${driver.id}")
@@ -882,7 +907,7 @@ private[deploy] class Master(
       }
       completedApps += app // Remember it in our history
       waitingApps -= app
-
+      // 关闭该App所占用的Executor
       for (exec <- app.executors.values) {
         killExecutor(exec)
       }
@@ -891,8 +916,9 @@ private[deploy] class Master(
         app.driver.send(ApplicationRemoved(state.toString))
       }
       persistenceEngine.removeApplication(app)
+      // 有空闲资源，调度任务
       schedule()
-
+      // 告诉worker app完成
       // Tell all workers that the application has finished, so they can clean up any app state.
       workers.foreach { w =>
         w.endpoint.send(ApplicationFinished(app.id))

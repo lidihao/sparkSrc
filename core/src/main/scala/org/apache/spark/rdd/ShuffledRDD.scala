@@ -88,7 +88,7 @@ class ShuffledRDD[K: ClassTag, V: ClassTag, C: ClassTag](
   }
 
   override val partitioner = Some(part)
-
+  // new ShuffledRDDPartition[part.numPartitions]
   override def getPartitions: Array[Partition] = {
     Array.tabulate[Partition](part.numPartitions)(i => new ShuffledRDDPartition(i))
   }

@@ -22,6 +22,7 @@ import org.apache.spark.storage.ShuffleBlockId
 
 private[spark]
 /**
+  * 根据shuffle的逻辑名称获取Block
  * Implementers of this trait understand how to retrieve block data for a logical shuffle block
  * identifier (i.e. map, reduce, and shuffle). Implementations may use files or file segments to
  * encapsulate shuffle data. This is used by the BlockStore to abstract over different shuffle
